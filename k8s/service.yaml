@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: express-app
+  name: next-app
 spec:
   type: ClusterIP
   selector:
