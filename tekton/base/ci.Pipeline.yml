@@ -1,0 +1,78 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci-pipeline
+spec:
+  workspaces:
+    - name: shared
+  params:
+    - name: source-repo
+      type: string
+    - name: image-repo
+      type: string
+    - name: app-name
+      type: string
+      description: Application name
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: shared
+      params:
+        - name: url
+          value: $(params.source-repo)
+    - name: run-tests
+      runAfter:
+        - fetch-repository
+      taskRef:
+        name: npm-test
+      workspaces:
+        - name: source
+          workspace: shared
+    - name: buildah
+      runAfter:
+        - run-tests
+      taskRef:
+        name: buildah
+        kind: ClusterTask
+      params:
+        - name: IMAGE
+          value: $(params.image-repo):$(tasks.fetch-repository.results.commit)
+      workspaces:
+        - name: source
+          workspace: shared
+    - name: create-configuration
+      runAfter:
+        - buildah
+      taskRef:
+        name: create-configuration
+      params:
+        - name: app-name
+          value: '$(params.app-name)'
+        - name: source-repo
+          value: '$(params.source-repo)'
+        - name: commit
+          value: '$(tasks.fetch-repository.results.commit)'
+        - name: image-repo
+          value: '$(params.image-repo)'
+        - name: runtime
+          value: 'js'
+      workspaces:
+        - name: source
+          workspace: shared
+    - name: deploy
+      params:
+        - name: app-namespace
+          value: '$(context.pipelineRun.namespace)'
+        - name: manifest
+          value: '$(tasks.create-configuration.results.manifest)'
+      runAfter:
+        - create-configuration
+      taskRef:
+        name: deploy
+      workspaces:
+        - name: source
+          workspace: shared
