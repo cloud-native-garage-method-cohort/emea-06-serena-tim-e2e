@@ -5,14 +5,21 @@ metadata:
 spec:
   workspaces:
     - name: shared
+    - name: production-repository
   params:
-    - name: source-repo
-      type: string
-    - name: image-repo
-      type: string
     - name: app-name
       type: string
       description: Application name
+    - name: source-repo
+      type: string
+      description: Source code repository
+    - name: sha
+      type: string
+      default: ""
+      description: Precise SHA of the commit to build
+    - name: image-repo
+      type: string
+      description: Docker image repository
   tasks:
     - name: fetch-repository
       taskRef:
@@ -76,3 +83,20 @@ spec:
       workspaces:
         - name: source
           workspace: shared
+    - name: save-configuration
+      params:
+        - name: manifest
+          value: "$(tasks.create-configuration.results.manifest)"
+        - name: app-name
+          value: "$(params.app-name)"
+        - name: sha
+          value: "$(tasks.fetch-repository.results.commit)"
+      runAfter:
+        - deploy
+      taskRef:
+        name: save-configuration
+      workspaces:
+        - name: source
+          workspace: shared
+        - name: target
+          workspace: production-repository
